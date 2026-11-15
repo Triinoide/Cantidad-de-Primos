@@ -153,12 +153,6 @@ st.markdown(
 # ----- Barra lateral -----
 with st.sidebar:
     st.header("⚙️ Configuración")
-    N = st.number_input(
-        "Graficar hasta n =", min_value=10, max_value=2_000_000, value=1000, step=100,
-        help="Límite superior del gráfico.",
-    )
-    N = int(N)
-
     aprox_elegidas = st.multiselect(
         "Aproximaciones a comparar",
         list(APROXIMACIONES.keys()),
@@ -168,9 +162,10 @@ with st.sidebar:
     st.subheader("Opciones del gráfico")
     escala_log = st.checkbox("Escala logarítmica en el eje x", value=False)
     mostrar_grilla = st.checkbox("Mostrar grilla", value=True)
-    marcar_numero = st.checkbox("Marcar en el gráfico el número consultado", value=True)
+    marcar_numero = st.checkbox("Marcar el número ingresado al final de la curva", value=True)
 
     st.divider()
+    st.caption("El gráfico se dibuja hasta el número que ingresás en «¿Es primo?».")
     st.caption(
         "Para n grandes se usa la *Criba de Eratóstenes*, que da el mismo resultado que "
         "la función `esPrimo` del proyecto pero mucho más rápido."
@@ -181,8 +176,13 @@ st.subheader("🔍 ¿Es primo?")
 col_in, col_res = st.columns([1, 2])
 with col_in:
     numero = int(
-        st.number_input("Ingresá un número natural", min_value=1, value=97, step=1, key="numero")
+        st.number_input("Ingresá un número natural", min_value=1, max_value=2_000_000,
+                        value=97, step=1, key="numero",
+                        help="Además de verificar si es primo, el gráfico se dibuja hasta este número.")
     )
+
+# El gráfico llega hasta el número ingresado (al menos hasta 2, para que haya algún primo)
+N = max(numero, 2)
 
 with col_res:
     if esPrimo(numero):
@@ -196,17 +196,13 @@ with col_res:
         st.latex(f"{numero} = {texto_factorizacion(fac)}")
 
 # Primo anterior y siguiente
-if numero <= 2_000_000:
-    anterior = next((k for k in range(numero - 1, 1, -1) if esPrimo(k)), None)
-    siguiente = next(k for k in range(numero + 1, numero + 10_000) if esPrimo(k))
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Primo anterior", anterior if anterior else "—")
-    c2.metric("Primo siguiente", siguiente)
-    if numero <= N:
-        c3.metric(f"π({numero})", int(contador_primos(N)[numero]),
-                  help="Cantidad de primos menores o iguales al número ingresado.")
-    else:
-        c3.metric(f"π({numero})", int(contador_primos(numero)[numero]))
+anterior = next((k for k in range(numero - 1, 1, -1) if esPrimo(k)), None)
+siguiente = next(k for k in range(numero + 1, numero + 10_000) if esPrimo(k))
+c1, c2, c3 = st.columns(3)
+c1.metric("Primo anterior", anterior if anterior else "—")
+c2.metric("Primo siguiente", siguiente)
+c3.metric(f"π({numero})", int(contador_primos(N)[numero]),
+          help="Cantidad de primos menores o iguales al número ingresado.")
 
 st.divider()
 
@@ -222,6 +218,9 @@ cols = st.columns(1 + len(aprox_elegidas))
 cols[0].metric("π(n) real", f"{int(pi[N]):,}".replace(",", "."))
 for col, nombre in zip(cols[1:], aprox_elegidas):
     valor = valores_aprox[nombre][N]
+    if np.isnan(valor):
+        col.metric(nombre, "—", help="Esta aproximación solo se calcula para n ≥ 10.")
+        continue
     error_rel = (valor - pi[N]) / pi[N] * 100
     col.metric(nombre, f"{valor:,.1f}".replace(",", "X").replace(".", ",").replace("X", "."),
                delta=f"{error_rel:+.2f} % de error".replace(".", ","), delta_color="off")
@@ -260,6 +259,8 @@ with tab_graf:
 with tab_error:
     if not aprox_elegidas:
         st.info("Elegí al menos una aproximación en la barra lateral.")
+    elif N < 20:
+        st.info("Ingresá un número mayor o igual a 20 para ver este gráfico.")
     else:
         st.markdown(
             "El cociente **π(x) / aproximación** debería acercarse a **1** a medida que x crece "
